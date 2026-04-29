@@ -72,6 +72,7 @@ Este proyecto fue desarrollado con fines educativos para comprender el funcionam
 - La implementación es una simulación, no una implementación completa del protocolo.
 - No se incluye codificación binaria real.
 - Se enfoca en la comprensión conceptual del algoritmo.
+- Otra fuente de información sobre Qpack: https://http3-explained.haxx.se/es/h3/h3-streams
 
 ---
 
