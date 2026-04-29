@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Simulador QPACK</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #0f172a;
+    color: white;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+}
+
+.container {
+    width: 1000px;
+    background: #1e293b;
+    padding: 20px;
+    border-radius: 12px;
+}
+
+h2 {
+    text-align: center;
+}
+
+textarea {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    resize: none;
+}
+
+button {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    background: #3b82f6;
+    color: white;
+}
+
+button:hover {
+    background: #2563eb;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.card {
+    background: #334155;
+    padding: 10px;
+    border-radius: 10px;
+}
+
+.literal {
+    color: #facc15;
+}
+
+.index {
+    color: #22c55e;
+}
+
+.proceso {
+    background: #1e40af;
+}
+
+.footer {
+    margin-top: 20px;
+    background: #0f172a;
+    padding: 10px;
+    border-radius: 10px;
+}
+
+.descripcion {
+    text-align: center;
+    font-size: 14px;
+    color: #cbd5f5;
+    margin-top: -10px;
+    margin-bottom: 15px;
+}
+
+.nota {
+    font-style: italic;
+    font-size: 13px;
+    color: #94a3b8;
+    margin-top: 10px;
+}
+
+.nota a {
+    color: #60a5fa;
+    text-decoration: none;
+}
+
+.nota a:hover {
+    text-decoration: underline;
+}
+
+#tablaEstatica {
+    max-height: 200px;
+    overflow-y: auto;
+
+    
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Simulador QPACK</h2>
+
+<p class="descripcion">
+QPACK es un algoritmo de compresión de headers usado en HTTP/3. 
+Reduce el tamaño de los datos reemplazando headers repetidos por índices.
+</p>
+
+<textarea id="input" rows="5">
+:method: GET
+host: example.com
+host: example.com
+</textarea>
+
+<button onclick="comprimir()">Comprimir</button>
+<button onclick="reset()">Reset</button>
+
+<div class="grid">
+
+<div class="card">
+<h3>Resultado</h3>
+<div id="resultado"></div>
+</div>
+
+<div class="card">
+<h3>Tabla Dinámica</h3>
+<div id="tablaDinamica"></div>
+</div>
+
+<div class="card">
+<h3>Estadísticas</h3>
+<div id="stats"></div>
+</div>
+
+<div class="card proceso">
+<h3>Proceso QPACK</h3>
+<div id="proceso"></div>
+</div>
+
+</div>
+
+<!-- TABLA ESTÁTICA -->
+<div class="footer">
+
+<h3>Tabla Estática (simplificada)</h3>
+
+<div id="tablaEstatica"></div>
+
+<button onclick="toggleTabla()">Ver tabla completa</button>
+
+<p class="nota">
+Tabla basada en el 
+<a href="https://www.rfc-editor.org/rfc/rfc9204.html#appendix-A" target="_blank">
+RFC 9204 (QPACK)
+</a>. 
+Se presenta en formato simplificado (name + value unidos) para facilitar la simulación.
+</p>
+
+</div>
+
+</div>
+
+<script>
+
+//  TABLA ESTATICA SIMPLIFICADA
+let tablaEstatica = [
+":authority",
+":path: /",
+":method: GET",
+":method: POST",
+":scheme: https",
+":status: 200",
+":status: 204",
+":status: 206",
+":status: 304",
+":status: 400",
+":status: 404",
+":status: 500",
+"accept: */*",
+"accept-encoding: gzip, deflate, br",
+"accept-language: es-ES",
+"cache-control: no-cache",
+"content-type: text/html",
+"content-type: application/json",
+"user-agent",
+"host",
+"cookie",
+"set-cookie"
+];
+
+let tablaDinamica = [];
+let expandida = false;
+
+//  tamaño en bytes
+function tamaño(str) {
+    return new TextEncoder().encode(str).length;
+}
+
+//  render tabla estatica
+function renderTablaEstatica() {
+    let lista = expandida ? tablaEstatica : tablaEstatica.slice(0, 10);
+
+    document.getElementById("tablaEstatica").innerHTML =
+        lista.map((h,i) => `${i} → ${h}`).join("<br>");
+}
+
+//  toggle para ver mas de la tabla estática
+function toggleTabla() {
+    expandida = !expandida;
+    renderTablaEstatica();
+}
+
+// compresion QPACK
+function comprimir() {
+
+    let input = document.getElementById("input").value.split("\n");
+
+    let resultadoHTML = "";
+    let procesoHTML = "";
+
+    let originalSize = 0;
+    let compressedSize = 0;
+
+    input.forEach(header => {
+
+        if (!header.trim()) return;
+
+        originalSize += tamaño(header);
+
+        procesoHTML += `<b>${header}</b><br>`;
+
+        //  Buscar en tabla estática
+        let indexStatic = tablaEstatica.indexOf(header);
+
+        if (indexStatic !== -1) {
+            resultadoHTML += `<div class="index">index estático → ${indexStatic}</div>`;
+            procesoHTML += `Encontrado en tabla estática (índice ${indexStatic})<br><br>`;
+            compressedSize += 2;
+            return;
+        }
+
+        //  Buscar en tabla dinámica
+        let indexDynamic = tablaDinamica.indexOf(header);
+
+        if (indexDynamic !== -1) {
+            resultadoHTML += `<div class="index">index dinámico → ${indexDynamic}</div>`;
+            procesoHTML += ` Encontrado en tabla dinámica (índice ${indexDynamic})<br><br>`;
+            compressedSize += 2;
+            return;
+        }
+
+        //  Nuevo header es para que se añada a la tabla dinámica
+        tablaDinamica.push(header);
+
+        resultadoHTML += `<div class="literal">literal → ${header}</div>`;
+        procesoHTML += `No encontrado → se guarda en tabla dinámica<br><br>`;
+
+        compressedSize += tamaño(header);
+
+    });
+
+    document.getElementById("resultado").innerHTML = resultadoHTML;
+
+    document.getElementById("tablaDinamica").innerHTML =
+        tablaDinamica.map((h,i) => `${i} → ${h}`).join("<br>");
+
+    document.getElementById("stats").innerHTML =
+        `Original: ${originalSize} bytes<br>
+         Comprimido: ${compressedSize} bytes<br>
+         Ahorro: ${originalSize - compressedSize} bytes`;
+
+    document.getElementById("proceso").innerHTML = procesoHTML;
+
+    renderTablaEstatica();
+}
+
+// 🔹 Reset
+function reset() {
+    tablaDinamica = [];
+    document.getElementById("resultado").innerHTML = "";
+    document.getElementById("tablaDinamica").innerHTML = "";
+    document.getElementById("stats").innerHTML = "";
+    document.getElementById("proceso").innerHTML = "";
+}
+
+// 🔹 Inicial
+renderTablaEstatica();
+
+</script>
+
+</body>
+</html>
