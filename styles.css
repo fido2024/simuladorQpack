@@ -98,3 +98,11 @@ button:hover {
 .nota a:hover {
     text-decoration: underline;
 }
+
+#hops {
+    font-family: monospace;
+    background: #020617;
+    padding: 10px;
+    border-radius: 8px;
+    line-height: 1.6;
+}
